@@ -47,7 +47,7 @@ The app uses local authentication — no Firebase, no account needed.
 - Tap the green **confirm button** to load posts.
 - Tap the **location crosshair** (top-left) to jump to your device's current GPS position.
 
-### The tweets screen
+### The posts screen
 
 Shows Mastodon posts from [mastodon.social](https://mastodon.social) tagged with both `#Android` and `#<city>` (e.g. `#android + #london`). If the city has no co-tagged posts the feed falls back to global `#Android` posts.
 
