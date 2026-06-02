@@ -54,6 +54,9 @@ dependencies {
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.4.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7'
+    implementation 'androidx.activity:activity-ktx:1.9.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1'
     implementation 'com.google.android.gms:play-services-maps:20.0.0'
     implementation 'com.google.android.gms:play-services-location:21.3.0'
 

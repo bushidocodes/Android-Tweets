@@ -8,80 +8,77 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.Toast
-import com.google.android.gms.tasks.Task
+import androidx.activity.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.firebase.analytics.FirebaseAnalytics
-import com.google.firebase.auth.AuthResult
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseUser
 import edu.gwu.androidtweets.databinding.ActivityMainBinding
+import edu.gwu.androidtweets.viewmodel.AuthViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var firebaseAuth: FirebaseAuth
-    private lateinit var firebaseAnalytics: FirebaseAnalytics
+    private val viewModel: AuthViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val sharedPrefs: SharedPreferences = getSharedPreferences("android-tweets", Context.MODE_PRIVATE)
+        val firebaseAnalytics = FirebaseAnalytics.getInstance(this)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        firebaseAuth = FirebaseAuth.getInstance()
-        firebaseAnalytics = FirebaseAnalytics.getInstance(this)
-
         binding.login.isEnabled = false
         binding.signUp.isEnabled = false
 
-        binding.login.setOnClickListener {
-            val inputtedUsername: String = binding.username.text.toString()
-            val inputtedPassword: String = binding.password.text.toString()
-
-            firebaseAuth
-                .signInWithEmailAndPassword(inputtedUsername, inputtedPassword)
-                .addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.loginResult.collect { result ->
+                    result ?: return@collect
+                    if (result.isSuccess) {
+                        val email = result.getOrNull()!!
                         firebaseAnalytics.logEvent("login_success", null)
-
-                        val user: FirebaseUser = firebaseAuth.currentUser!!
-                        Toast.makeText(this, "Logged in as ${user.email}!", Toast.LENGTH_LONG).show()
-
+                        Toast.makeText(this@MainActivity, "Logged in as $email!", Toast.LENGTH_LONG).show()
                         sharedPrefs.edit()
                             .putString("SAVED_USERNAME", binding.username.text.toString())
                             .apply()
-
-                        startActivity(Intent(this, MapsActivity::class.java))
+                        startActivity(Intent(this@MainActivity, MapsActivity::class.java))
                     } else {
-                        val exception = task.exception
-                        val reason = if (exception is FirebaseAuthInvalidCredentialsException)
+                        val e = result.exceptionOrNull()
+                        val reason = if (e is FirebaseAuthInvalidCredentialsException)
                             "invalid_credentials" else "generic_failure"
-
                         firebaseAnalytics.logEvent("login_failed", Bundle().apply {
                             putString("error_type", reason)
                         })
-
-                        Toast.makeText(this, "Failed to log in: $exception", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "Failed to log in: $e", Toast.LENGTH_LONG).show()
                     }
                 }
+            }
+        }
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.signUpResult.collect { result ->
+                    result ?: return@collect
+                    if (result.isSuccess) {
+                        Toast.makeText(this@MainActivity, "Signed up as ${result.getOrNull()}!", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(this@MainActivity, "Failed to sign up: ${result.exceptionOrNull()}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+
+        binding.login.setOnClickListener {
+            viewModel.login(binding.username.text.toString(), binding.password.text.toString())
         }
 
         binding.signUp.setOnClickListener {
-            val inputtedUsername: String = binding.username.text.toString()
-            val inputtedPassword: String = binding.password.text.toString()
-
-            firebaseAuth
-                .createUserWithEmailAndPassword(inputtedUsername, inputtedPassword)
-                .addOnCompleteListener { task: Task<AuthResult> ->
-                    if (task.isSuccessful) {
-                        val user: FirebaseUser = firebaseAuth.currentUser!!
-                        Toast.makeText(this, "Signed up as ${user.email}!", Toast.LENGTH_LONG).show()
-                    } else {
-                        Toast.makeText(this, "Failed to sign up: ${task.exception}", Toast.LENGTH_LONG).show()
-                    }
-                }
+            viewModel.signUp(binding.username.text.toString(), binding.password.text.toString())
         }
 
         val textWatcher = object : TextWatcher {
@@ -96,7 +93,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.username.addTextChangedListener(textWatcher)
         binding.password.addTextChangedListener(textWatcher)
-
         binding.username.setText(sharedPrefs.getString("SAVED_USERNAME", ""))
     }
 }

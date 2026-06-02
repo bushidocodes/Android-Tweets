@@ -5,11 +5,15 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Address
-import android.location.Geocoder
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.viewModels
+import androidx.appcompat.content.res.AppCompatResources
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -22,17 +26,18 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
-import androidx.appcompat.content.res.AppCompatResources
 import com.google.firebase.auth.FirebaseAuth
 import edu.gwu.androidtweets.databinding.ActivityMapsBinding
+import edu.gwu.androidtweets.viewmodel.LocationSelection
+import edu.gwu.androidtweets.viewmodel.MapsViewModel
+import kotlinx.coroutines.launch
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var binding: ActivityMapsBinding
     private lateinit var mMap: GoogleMap
-    private lateinit var firebaseAuth: FirebaseAuth
     private lateinit var locationProvider: FusedLocationProviderClient
-    private var currentAddress: Address? = null
+    private val viewModel: MapsViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,21 +45,28 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         setContentView(binding.root)
 
         locationProvider = LocationServices.getFusedLocationProviderClient(this)
-        firebaseAuth = FirebaseAuth.getInstance()
-        title = getString(R.string.maps_title, firebaseAuth.currentUser!!.email)
+        title = getString(R.string.maps_title, FirebaseAuth.getInstance().currentUser!!.email)
 
-        binding.currentLocation.setOnClickListener {
-            checkLocationPermission()
-        }
-
+        binding.currentLocation.setOnClickListener { checkLocationPermission() }
+        binding.confirm.isEnabled = false
         binding.confirm.setOnClickListener {
-            if (currentAddress != null) {
-                val intent = Intent(this, TweetsActivity::class.java)
-                intent.putExtra("address", currentAddress)
-                startActivity(intent)
+            viewModel.selection.value?.let { selection ->
+                startActivity(
+                    Intent(this, TweetsActivity::class.java)
+                        .putExtra("address", selection.address)
+                )
             }
         }
-        binding.confirm.isEnabled = false
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.selection.collect { selection ->
+                    if (selection != null && ::mMap.isInitialized) {
+                        placePin(selection)
+                    }
+                }
+            }
+        }
 
         val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
@@ -75,7 +87,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             super.onLocationResult(result)
             locationProvider.removeLocationUpdates(this)
             val location = result.lastLocation ?: return
-            doGeocoding(LatLng(location.latitude, location.longitude))
+            viewModel.geocode(LatLng(location.latitude, location.longitude))
         }
     }
 
@@ -85,7 +97,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             .setWaitForAccurateLocation(false)
             .setMinUpdateIntervalMillis(5_000L)
             .build()
-
         locationProvider.requestLocationUpdates(locationRequest, locationCallback, null)
     }
 
@@ -116,38 +127,20 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
-        mMap.setOnMapLongClickListener { coords -> doGeocoding(coords) }
+        mMap.setOnMapLongClickListener { coords -> viewModel.geocode(coords) }
+        // Restore pin on rotation — ViewModel already has the selection
+        viewModel.selection.value?.let { placePin(it) }
     }
 
-    private fun doGeocoding(coords: LatLng) {
+    private fun placePin(selection: LocationSelection) {
         mMap.clear()
-
-        Thread {
-            val geocoder = Geocoder(this@MapsActivity)
-            @Suppress("DEPRECATION")
-            val results: List<Address> = try {
-                geocoder.getFromLocation(coords.latitude, coords.longitude, 10) ?: listOf()
-            } catch (exception: Exception) {
-                Log.e("MapsActivity", "Geocoding failed", exception)
-                listOf()
-            }
-
-            runOnUiThread {
-                if (results.isNotEmpty()) {
-                    val firstResult = results.first()
-                    mMap.addMarker(
-                        MarkerOptions()
-                            .position(coords)
-                            .title(firstResult.getAddressLine(0))
-                    )
-                    mMap.animateCamera(CameraUpdateFactory.newLatLng(coords))
-                    updateConfirmButton(firstResult)
-                } else {
-                    Log.e("MapsActivity", "Geocoding failed or returned no results")
-                    Toast.makeText(this@MapsActivity, "No results for location!", Toast.LENGTH_LONG).show()
-                }
-            }
-        }.start()
+        mMap.addMarker(
+            MarkerOptions()
+                .position(selection.coords)
+                .title(selection.address.getAddressLine(0))
+        )
+        mMap.animateCamera(CameraUpdateFactory.newLatLng(selection.coords))
+        updateConfirmButton(selection.address)
     }
 
     private fun updateConfirmButton(address: Address) {
@@ -157,6 +150,5 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         )
         binding.confirm.text = address.getAddressLine(0)
         binding.confirm.isEnabled = true
-        currentAddress = address
     }
 }
