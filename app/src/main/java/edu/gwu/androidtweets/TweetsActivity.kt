@@ -56,13 +56,27 @@ class TweetsActivity : AppCompatActivity() {
         binding.addTweet.hide()
         binding.tweetContent.visibility = View.GONE
 
-        val city = address.locality ?: address.adminArea ?: "Unknown"
-        setTitle(getString(R.string.tweets_title, city))
+        // Use the most specific available location name for display and search
+        val city = address.locality
+            ?: address.subAdminArea
+            ?: address.adminArea
+            ?: address.countryName
+            ?: ""
+        val displayCity = city.ifEmpty { address.getAddressLine(0) ?: "Unknown" }
+        setTitle(getString(R.string.tweets_title, displayCity))
 
         lifecycleScope.launch {
             try {
                 val statuses = withContext(Dispatchers.IO) {
-                    MastodonApi.service.tagTimeline(hashtag = "Android")
+                    val cityTag = city.toHashtag()
+                    // Try filtered by city first; fall back to unfiltered #Android if no results
+                    val filtered = if (cityTag.isNotEmpty()) {
+                        MastodonApi.service.tagTimeline(hashtag = "Android", cityTag = cityTag)
+                    } else emptyList()
+
+                    filtered.ifEmpty {
+                        MastodonApi.service.tagTimeline(hashtag = "Android")
+                    }
                 }
                 val tweets = statuses.map { it.toTweet() }
                 currentTweets.clear()
@@ -109,3 +123,7 @@ class TweetsActivity : AppCompatActivity() {
         })
     }
 }
+
+private fun String.toHashtag(): String = lowercase()
+    .replace(Regex("[^a-z0-9]"), "")
+    .trim()

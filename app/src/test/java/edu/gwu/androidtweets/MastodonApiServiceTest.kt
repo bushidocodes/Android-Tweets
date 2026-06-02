@@ -68,6 +68,28 @@ class MastodonApiServiceTest {
     }
 
     @Test
+    fun `tagTimeline includes city tag as all-brackets param when provided`() = runTest {
+        mockWebServer.enqueue(MockResponse().setBody("[]").setResponseCode(200))
+
+        service().tagTimeline(hashtag = "Android", cityTag = "london")
+
+        val request = mockWebServer.takeRequest()
+        val path = request.path!!
+        // Retrofit encodes [] as %5B%5D — Mastodon accepts both forms
+        assertTrue("path should include city tag", path.contains("all") && path.contains("london"))
+    }
+
+    @Test
+    fun `tagTimeline omits city filter param when cityTag is null`() = runTest {
+        mockWebServer.enqueue(MockResponse().setBody("[]").setResponseCode(200))
+
+        service().tagTimeline(hashtag = "Android", cityTag = null)
+
+        val request = mockWebServer.takeRequest()
+        assertTrue("path should not include all[] when no city", !request.path!!.contains("all"))
+    }
+
+    @Test
     fun `tagTimeline ignores unknown JSON fields`() = runTest {
         val jsonWithExtraFields = """
             [{"id":"1","content":"<p>Test</p>","uri":"https://example.com/1","created_at":"2024-01-01T00:00:00.000Z",
