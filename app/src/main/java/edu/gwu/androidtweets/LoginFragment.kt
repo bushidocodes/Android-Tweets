@@ -95,7 +95,8 @@ class LoginFragment : Fragment() {
             override fun afterTextChanged(s: Editable) {}
             override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {
-                val enable = binding.username.text.isNotEmpty() && binding.password.text.isNotEmpty()
+                val enable = binding.username.text?.isNotEmpty() == true &&
+                        binding.password.text?.isNotEmpty() == true
                 binding.login.isEnabled = enable
                 binding.signUp.isEnabled = enable
             }
