@@ -22,6 +22,7 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import androidx.appcompat.content.res.AppCompatResources
 import com.google.firebase.auth.FirebaseAuth
 import edu.gwu.androidtweets.databinding.ActivityMapsBinding
 
@@ -152,7 +153,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun updateConfirmButton(address: Address) {
         binding.confirm.setBackgroundColor(getColor(R.color.buttonGreen))
         binding.confirm.setCompoundDrawablesWithIntrinsicBounds(
-            getDrawable(R.drawable.ic_baseline_check_24), null, null, null
+            AppCompatResources.getDrawable(this, R.drawable.ic_baseline_check_24), null, null, null
         )
         binding.confirm.text = address.getAddressLine(0)
         binding.confirm.isEnabled = true

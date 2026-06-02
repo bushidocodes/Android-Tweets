@@ -37,6 +37,18 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
+
+    lint {
+        // Picasso's RemoteViewsAction.NotificationAction triggers this; our app doesn't post notifications.
+        // Remove once Picasso is replaced with Coil in Phase 5.
+        disable 'NotificationPermission'
+        // Deferred to Phase 4 (Navigation + Fragments migration)
+        disable 'FragmentTagUsage'
+        // Adaptive icon monochrome tag is a design asset, not a code issue
+        disable 'MonochromeLauncherIcon'
+        // Informational version-update notices
+        disable 'GradleDependency'
+    }
 }
 
 dependencies {
@@ -60,6 +72,10 @@ dependencies {
     implementation 'com.google.android.material:material:1.12.0'
 
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
+    // org.json is part of the Android framework; JVM unit tests get stubs that throw.
+    // This standalone artifact provides a real implementation for host-side tests.
+    testImplementation 'org.json:json:20240303'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
 }
