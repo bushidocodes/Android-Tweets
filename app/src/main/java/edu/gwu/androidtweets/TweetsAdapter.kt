@@ -1,57 +1,30 @@
 package edu.gwu.androidtweets
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.TextView
-import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.recyclerview.widget.RecyclerView
 import com.squareup.picasso.Picasso
+import edu.gwu.androidtweets.databinding.RowTweetBinding
 
 class TweetsAdapter(val tweets: List<Tweet>) : RecyclerView.Adapter<TweetsAdapter.ViewHolder>() {
 
-    // A ViewHolder represents the Views that comprise a single row in our list (e.g.
-    // our row to display a Tweet contains three TextViews and one ImageView).
-    //
-    // The "itemView" passed into the constructor comes from onCreateViewHolder because our LayoutInflater
-    // ultimately returns a reference to the root View in the row's inflated layout. From there, we can
-    // call findViewById to search from that root View downwards to find the Views we card about.
-    class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val username: TextView = itemView.findViewById(R.id.username)
-        val handle: TextView = itemView.findViewById(R.id.handle)
-        val content: TextView = itemView.findViewById(R.id.tweet_content)
-        val icon: ImageView = itemView.findViewById(R.id.icon)
-    }
+    class ViewHolder(val binding: RowTweetBinding) : RecyclerView.ViewHolder(binding.root)
 
-    // The RecyclerView needs a new row - we need to tell it what XML file to use
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        // Layout inflation (read & parse XML file and return a reference to the root layout)
-        val layoutInflater: LayoutInflater = LayoutInflater.from(parent.context)
-        val itemView: View = layoutInflater.inflate(R.layout.row_tweet, parent, false)
-        val x: ConstraintLayout
-        return ViewHolder(itemView)
+        val binding = RowTweetBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        return ViewHolder(binding)
     }
 
-    // How many rows in total do you want to render?
-    override fun getItemCount(): Int {
-        return tweets.size
-    }
+    override fun getItemCount(): Int = tweets.size
 
-    // The RecyclerView is ready to display a row - fill it with content
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val currentTweet = tweets[position]
-        holder.username.text = currentTweet.username
-        holder.handle.text = currentTweet.handle
-        holder.content.text = currentTweet.content
+        val tweet = tweets[position]
+        holder.binding.username.text = tweet.username
+        holder.binding.handle.text = tweet.handle
+        holder.binding.tweetContent.text = tweet.content
 
-        if (currentTweet.iconUrl.isNotEmpty()) {
-            // Useful to see the caching in action
-            // Picasso.get().setIndicatorsEnabled(true)
-
-            Picasso.get()
-                .load(currentTweet.iconUrl)
-                .into(holder.icon)
+        if (tweet.iconUrl.isNotEmpty()) {
+            Picasso.get().load(tweet.iconUrl).into(holder.binding.icon)
         }
     }
 }

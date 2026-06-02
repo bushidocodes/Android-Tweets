@@ -10,7 +10,9 @@ import java.net.URLEncoder
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 
-class TwitterManager {
+class TwitterManager(
+    private val baseUrl: String = "https://api.twitter.com"
+) {
 
     val okHttpClient: OkHttpClient
 
@@ -69,7 +71,7 @@ class TwitterManager {
 
         // The encoded secrets become a header on the request
         val request = Request.Builder()
-            .url("https://api.twitter.com/oauth2/token")
+            .url("$baseUrl/oauth2/token")
             .header("Authorization", "Basic $base64Combined")
             .post(requestBody)
             .build()
@@ -110,7 +112,7 @@ class TwitterManager {
         // Build the request
         // The OAuth token becomes a header on the request
         val request: Request = Request.Builder()
-            .url("https://api.twitter.com/1.1/search/tweets.json?q=$searchTerm&geocode=$latitude,$longitude,$radius")
+            .url("$baseUrl/1.1/search/tweets.json?q=$searchTerm&geocode=$latitude,$longitude,$radius")
             .header("Authorization", "Bearer $oAuthToken")
             .get()
             .build()
