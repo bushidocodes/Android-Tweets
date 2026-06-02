@@ -2,18 +2,21 @@ package edu.gwu.androidtweets
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.Intent
-import android.content.pm.PackageManager
 import android.location.Address
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
-import androidx.activity.viewModels
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -27,38 +30,63 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.firebase.auth.FirebaseAuth
-import edu.gwu.androidtweets.databinding.ActivityMapsBinding
+import edu.gwu.androidtweets.databinding.FragmentMapsBinding
 import edu.gwu.androidtweets.viewmodel.LocationSelection
 import edu.gwu.androidtweets.viewmodel.MapsViewModel
 import kotlinx.coroutines.launch
 
-class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
+class MapsFragment : Fragment(), OnMapReadyCallback {
 
-    private lateinit var binding: ActivityMapsBinding
+    private var _binding: FragmentMapsBinding? = null
+    private val binding get() = _binding!!
+
     private lateinit var mMap: GoogleMap
     private lateinit var locationProvider: FusedLocationProviderClient
-    private val viewModel: MapsViewModel by viewModels()
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        binding = ActivityMapsBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+    // Scoped to Activity so TweetsFragment can read the selected address
+    private val viewModel: MapsViewModel by activityViewModels()
 
-        locationProvider = LocationServices.getFusedLocationProviderClient(this)
-        title = getString(R.string.maps_title, FirebaseAuth.getInstance().currentUser!!.email)
+    private val locationPermissionRequest = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.d("MapsFragment", "Permission result: Permission granted")
+            useCurrentLocation()
+        } else {
+            Log.d("MapsFragment", "Permission result: Permission denied")
+            Toast.makeText(
+                requireContext(),
+                "To use this feature, enable Location permission in Settings",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentMapsBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        locationProvider = LocationServices.getFusedLocationProviderClient(requireContext())
+        requireActivity().title = getString(
+            R.string.maps_title, FirebaseAuth.getInstance().currentUser!!.email
+        )
 
         binding.currentLocation.setOnClickListener { checkLocationPermission() }
         binding.confirm.isEnabled = false
         binding.confirm.setOnClickListener {
-            viewModel.selection.value?.let { selection ->
-                startActivity(
-                    Intent(this, TweetsActivity::class.java)
-                        .putExtra("address", selection.address)
-                )
+            viewModel.selection.value?.let {
+                findNavController().navigate(R.id.action_mapsFragment_to_tweetsFragment)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.selection.collect { selection ->
                     if (selection != null && ::mMap.isInitialized) {
@@ -68,17 +96,19 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
 
-        val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
+        val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
     }
 
     private fun checkLocationPermission() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            Log.d("MapsActivity", "Check permission: Permission already granted")
+        if (requireContext().checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.d("MapsFragment", "Check permission: Permission already granted")
             useCurrentLocation()
         } else {
-            Log.d("MapsActivity", "Check permission: Permission not granted")
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 200)
+            Log.d("MapsFragment", "Check permission: Requesting permission")
+            locationPermissionRequest.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
@@ -100,35 +130,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         locationProvider.requestLocationUpdates(locationRequest, locationCallback, null)
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 200) {
-            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d("MapsActivity", "Permission result: Permission granted")
-                useCurrentLocation()
-            } else {
-                if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
-                    Log.d("MapsActivity", "Permission result: Permission denied (regular)")
-                } else {
-                    Log.d("MapsActivity", "Permission result: Permission denied (do not re-prompt)")
-                    Toast.makeText(
-                        this,
-                        "To use this feature, go into your Settings and enable the Location permission",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-        }
-    }
-
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
         mMap.setOnMapLongClickListener { coords -> viewModel.geocode(coords) }
-        // Restore pin on rotation — ViewModel already has the selection
         viewModel.selection.value?.let { placePin(it) }
     }
 
@@ -144,11 +148,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun updateConfirmButton(address: Address) {
-        binding.confirm.setBackgroundColor(getColor(R.color.buttonGreen))
+        binding.confirm.setBackgroundColor(requireContext().getColor(R.color.buttonGreen))
         binding.confirm.setCompoundDrawablesWithIntrinsicBounds(
-            AppCompatResources.getDrawable(this, R.drawable.ic_baseline_check_24), null, null, null
+            AppCompatResources.getDrawable(requireContext(), R.drawable.ic_baseline_check_24),
+            null, null, null
         )
         binding.confirm.text = address.getAddressLine(0)
         binding.confirm.isEnabled = true
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

@@ -41,7 +41,7 @@ android {
 
     lint {
         disable 'NotificationPermission'  // Picasso transitive; removed in Phase 5
-        disable 'FragmentTagUsage'        // Deferred to Phase 4
+        disable 'FragmentTagUsage'        // Maps SupportMapFragment still requires <fragment> tag
         disable 'MonochromeLauncherIcon'  // Design asset, not a code issue
         disable 'GradleDependency'        // Informational only
     }
@@ -56,6 +56,8 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7'
     implementation 'androidx.activity:activity-ktx:1.9.3'
+    implementation 'androidx.navigation:navigation-fragment-ktx:2.8.5'
+    implementation 'androidx.navigation:navigation-ui-ktx:2.8.5'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1'
     implementation 'com.google.android.gms:play-services-maps:20.0.0'
     implementation 'com.google.android.gms:play-services-location:21.3.0'
