@@ -3,7 +3,7 @@ package edu.gwu.androidtweets
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.squareup.picasso.Picasso
+import coil.load
 import edu.gwu.androidtweets.databinding.RowTweetBinding
 
 class TweetsAdapter(val tweets: List<Tweet>) : RecyclerView.Adapter<TweetsAdapter.ViewHolder>() {
@@ -24,7 +24,7 @@ class TweetsAdapter(val tweets: List<Tweet>) : RecyclerView.Adapter<TweetsAdapte
         holder.binding.tweetContent.text = tweet.content
 
         if (tweet.iconUrl.isNotEmpty()) {
-            Picasso.get().load(tweet.iconUrl).into(holder.binding.icon)
+            holder.binding.icon.load(tweet.iconUrl)
         }
     }
 }
