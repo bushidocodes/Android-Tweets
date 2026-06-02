@@ -25,7 +25,7 @@ class TweetsFragment : Fragment() {
 
     // Reads the address selected in MapsFragment (activity-scoped)
     private val mapsViewModel: MapsViewModel by activityViewModels()
-    private val viewModel: TweetsViewModel by viewModels()
+    private val viewModel: TweetsViewModel by viewModels { TweetsViewModel.Factory }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
