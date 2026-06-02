@@ -5,26 +5,26 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import edu.gwu.androidtweets.api.MastodonApi
-import edu.gwu.androidtweets.api.dto.toTweet
 import edu.gwu.androidtweets.databinding.ActivityTweetsBinding
-import kotlinx.coroutines.Dispatchers
+import edu.gwu.androidtweets.viewmodel.TweetsViewModel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class TweetsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityTweetsBinding
     private lateinit var firebaseDatabase: FirebaseDatabase
-    private val currentTweets: MutableList<Tweet> = mutableListOf()
+    private val viewModel: TweetsViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,57 +36,39 @@ class TweetsActivity : AppCompatActivity() {
         @Suppress("DEPRECATION")
         val address: Address = intent.getParcelableExtra("address")!!
 
-        if (savedInstanceState != null) {
-            @Suppress("DEPRECATION", "UNCHECKED_CAST")
-            val savedTweets = savedInstanceState.getSerializable("TWEETS") as List<Tweet>
-            currentTweets.addAll(savedTweets)
-            binding.recyclerView.adapter = TweetsAdapter(currentTweets)
-            binding.recyclerView.layoutManager = LinearLayoutManager(this)
-        } else {
-            getTweetsFromMastodon(address)
-        }
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putSerializable("TWEETS", ArrayList(currentTweets))
-    }
-
-    private fun getTweetsFromMastodon(address: Address) {
-        binding.addTweet.hide()
-        binding.tweetContent.visibility = View.GONE
-
-        // Use the most specific available location name for display and search
         val city = address.locality
             ?: address.subAdminArea
             ?: address.adminArea
             ?: address.countryName
-            ?: ""
-        val displayCity = city.ifEmpty { address.getAddressLine(0) ?: "Unknown" }
-        setTitle(getString(R.string.tweets_title, displayCity))
+            ?: address.getAddressLine(0)
+            ?: "Unknown"
+        setTitle(getString(R.string.tweets_title, city))
+
+        binding.addTweet.hide()
+        binding.tweetContent.visibility = View.GONE
 
         lifecycleScope.launch {
-            try {
-                val statuses = withContext(Dispatchers.IO) {
-                    val cityTag = city.toHashtag()
-                    // Try filtered by city first; fall back to unfiltered #Android if no results
-                    val filtered = if (cityTag.isNotEmpty()) {
-                        MastodonApi.service.tagTimeline(hashtag = "Android", cityTag = cityTag)
-                    } else emptyList()
-
-                    filtered.ifEmpty {
-                        MastodonApi.service.tagTimeline(hashtag = "Android")
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.tweets.collect { result ->
+                    when {
+                        result == null -> {}
+                        result.isSuccess -> {
+                            val tweets = result.getOrNull()!!
+                            binding.recyclerView.adapter = TweetsAdapter(tweets)
+                            binding.recyclerView.layoutManager = LinearLayoutManager(this@TweetsActivity)
+                        }
+                        else -> {
+                            Log.e("TweetsActivity", "Failed to retrieve posts", result.exceptionOrNull())
+                            Toast.makeText(this@TweetsActivity, "Failed to retrieve posts!", Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
-                val tweets = statuses.map { it.toTweet() }
-                currentTweets.clear()
-                currentTweets.addAll(tweets)
-                binding.recyclerView.adapter = TweetsAdapter(tweets)
-                binding.recyclerView.layoutManager = LinearLayoutManager(this@TweetsActivity)
-            } catch (e: Exception) {
-                Log.e("TweetsActivity", "Failed to retrieve posts", e)
-                Toast.makeText(this@TweetsActivity, "Failed to retrieve posts!", Toast.LENGTH_LONG).show()
             }
+        }
+
+        // Guard against re-fetching on rotation — ViewModel already has the result
+        if (viewModel.tweets.value == null) {
+            viewModel.loadTweets(address)
         }
     }
 
@@ -123,7 +105,3 @@ class TweetsActivity : AppCompatActivity() {
         })
     }
 }
-
-private fun String.toHashtag(): String = lowercase()
-    .replace(Regex("[^a-z0-9]"), "")
-    .trim()
