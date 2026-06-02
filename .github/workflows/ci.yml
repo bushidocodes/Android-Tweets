@@ -32,6 +32,18 @@ jobs:
       - name: Write local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
 
+      # google_maps_api.xml is gitignored to prevent key leakage.
+      # Inject the key from the MAPS_API_KEY repository secret.
+      # Unit tests and lint pass with an empty key; assembleDebug needs the file to exist.
+      - name: Write Maps API key
+        run: |
+          mkdir -p app/src/debug/res/values
+          cat > app/src/debug/res/values/google_maps_api.xml <<EOF
+          <resources>
+            <string name="google_maps_key" templateMergeStrategy="preserve" translatable="false">${{ secrets.MAPS_API_KEY }}</string>
+          </resources>
+          EOF
+
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
 
