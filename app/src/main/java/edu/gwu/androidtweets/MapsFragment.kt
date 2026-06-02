@@ -29,7 +29,7 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
-import com.google.firebase.auth.FirebaseAuth
+import android.content.Context
 import edu.gwu.androidtweets.databinding.FragmentMapsBinding
 import edu.gwu.androidtweets.viewmodel.LocationSelection
 import edu.gwu.androidtweets.viewmodel.MapsViewModel
@@ -74,9 +74,10 @@ class MapsFragment : Fragment(), OnMapReadyCallback {
         super.onViewCreated(view, savedInstanceState)
 
         locationProvider = LocationServices.getFusedLocationProviderClient(requireContext())
-        requireActivity().title = getString(
-            R.string.maps_title, FirebaseAuth.getInstance().currentUser!!.email
-        )
+        val email = requireContext()
+            .getSharedPreferences("android-tweets", Context.MODE_PRIVATE)
+            .getString("SAVED_USERNAME", "")
+        requireActivity().title = getString(R.string.maps_title, email)
 
         binding.currentLocation.setOnClickListener { checkLocationPermission() }
         binding.confirm.isEnabled = false

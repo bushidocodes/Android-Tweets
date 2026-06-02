@@ -14,8 +14,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import com.google.firebase.analytics.FirebaseAnalytics
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import edu.gwu.androidtweets.databinding.FragmentLoginBinding
 import edu.gwu.androidtweets.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
@@ -40,7 +38,6 @@ class LoginFragment : Fragment() {
 
         val sharedPrefs = requireContext()
             .getSharedPreferences("android-tweets", Context.MODE_PRIVATE)
-        val firebaseAnalytics = FirebaseAnalytics.getInstance(requireContext())
 
         binding.login.isEnabled = false
         binding.signUp.isEnabled = false
@@ -51,20 +48,17 @@ class LoginFragment : Fragment() {
                     result ?: return@collect
                     if (result.isSuccess) {
                         val email = result.getOrNull()!!
-                        firebaseAnalytics.logEvent("login_success", null)
-                        Toast.makeText(requireContext(), "Logged in as $email!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(requireContext(), "Logged in as $email!", Toast.LENGTH_SHORT).show()
                         sharedPrefs.edit()
-                            .putString("SAVED_USERNAME", binding.username.text.toString())
+                            .putString("SAVED_USERNAME", email)
                             .apply()
                         findNavController().navigate(R.id.action_loginFragment_to_mapsFragment)
                     } else {
-                        val e = result.exceptionOrNull()
-                        val reason = if (e is FirebaseAuthInvalidCredentialsException)
-                            "invalid_credentials" else "generic_failure"
-                        firebaseAnalytics.logEvent("login_failed", Bundle().apply {
-                            putString("error_type", reason)
-                        })
-                        Toast.makeText(requireContext(), "Failed to log in: $e", Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            requireContext(),
+                            result.exceptionOrNull()?.message ?: "Login failed",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }
@@ -75,9 +69,13 @@ class LoginFragment : Fragment() {
                 viewModel.signUpResult.collect { result ->
                     result ?: return@collect
                     if (result.isSuccess) {
-                        Toast.makeText(requireContext(), "Signed up as ${result.getOrNull()}!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(requireContext(), "Account created! You can now log in.", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(requireContext(), "Failed to sign up: ${result.exceptionOrNull()}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            requireContext(),
+                            result.exceptionOrNull()?.message ?: "Sign up failed",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }
