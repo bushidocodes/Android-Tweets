@@ -1,0 +1,26 @@
+[
+  {
+    "id": "111111111111111111",
+    "content": "<p>Just published my new Android app using Jetpack Compose! <a href=\"https://mastodon.social/tags/Android\" class=\"mention hashtag\">#<span>Android</span></a> <a href=\"https://mastodon.social/tags/Kotlin\" class=\"mention hashtag\">#<span>Kotlin</span></a></p>",
+    "account": {
+      "id": "1001",
+      "username": "androiddev",
+      "acct": "androiddev@mastodon.social",
+      "display_name": "Android Developer",
+      "avatar": "https://files.mastodon.social/accounts/avatars/1001/original/avatar.png",
+      "avatar_static": "https://files.mastodon.social/accounts/avatars/1001/static/avatar.png"
+    }
+  },
+  {
+    "id": "111111111111111112",
+    "content": "<p>Material You theming is &amp; fantastic in Android 12+. Love the dynamic colors!</p>",
+    "account": {
+      "id": "1002",
+      "username": "mobiledev",
+      "acct": "mobiledev@fosstodon.org",
+      "display_name": "",
+      "avatar": "https://cdn.fosstodon.org/accounts/avatars/1002/original/avatar.jpg",
+      "avatar_static": "https://cdn.fosstodon.org/accounts/avatars/1002/static/avatar.jpg"
+    }
+  }
+]

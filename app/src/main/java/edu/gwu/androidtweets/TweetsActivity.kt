@@ -6,13 +6,19 @@ import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import edu.gwu.androidtweets.api.MastodonApi
+import edu.gwu.androidtweets.api.dto.toTweet
 import edu.gwu.androidtweets.databinding.ActivityTweetsBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class TweetsActivity : AppCompatActivity() {
 
@@ -37,13 +43,51 @@ class TweetsActivity : AppCompatActivity() {
             binding.recyclerView.adapter = TweetsAdapter(currentTweets)
             binding.recyclerView.layoutManager = LinearLayoutManager(this)
         } else {
-            getTweetsFromTwitter(address)
+            getTweetsFromMastodon(address)
         }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putSerializable("TWEETS", ArrayList(currentTweets))
+    }
+
+    private fun getTweetsFromMastodon(address: Address) {
+        binding.addTweet.hide()
+        binding.tweetContent.visibility = View.GONE
+
+        // Use the most specific available location name for display and search
+        val city = address.locality
+            ?: address.subAdminArea
+            ?: address.adminArea
+            ?: address.countryName
+            ?: ""
+        val displayCity = city.ifEmpty { address.getAddressLine(0) ?: "Unknown" }
+        setTitle(getString(R.string.tweets_title, displayCity))
+
+        lifecycleScope.launch {
+            try {
+                val statuses = withContext(Dispatchers.IO) {
+                    val cityTag = city.toHashtag()
+                    // Try filtered by city first; fall back to unfiltered #Android if no results
+                    val filtered = if (cityTag.isNotEmpty()) {
+                        MastodonApi.service.tagTimeline(hashtag = "Android", cityTag = cityTag)
+                    } else emptyList()
+
+                    filtered.ifEmpty {
+                        MastodonApi.service.tagTimeline(hashtag = "Android")
+                    }
+                }
+                val tweets = statuses.map { it.toTweet() }
+                currentTweets.clear()
+                currentTweets.addAll(tweets)
+                binding.recyclerView.adapter = TweetsAdapter(tweets)
+                binding.recyclerView.layoutManager = LinearLayoutManager(this@TweetsActivity)
+            } catch (e: Exception) {
+                Log.e("TweetsActivity", "Failed to retrieve posts", e)
+                Toast.makeText(this@TweetsActivity, "Failed to retrieve posts!", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun getTweetsFromFirebase(address: Address) {
@@ -78,52 +122,8 @@ class TweetsActivity : AppCompatActivity() {
             }
         })
     }
-
-    private fun getTweetsFromTwitter(address: Address) {
-        binding.addTweet.hide()
-        binding.tweetContent.visibility = View.GONE
-        setTitle(getString(R.string.tweets_title, address.locality ?: "Unknown"))
-
-        Thread {
-            val twitterManager = TwitterManager()
-            try {
-                val oAuthToken = twitterManager.retrieveOAuthToken(
-                    apiKey = getString(R.string.twitter_api_key),
-                    apiSecret = getString(R.string.twitter_api_secret)
-                )
-                val tweets = twitterManager.retrieveTweets(
-                    oAuthToken = oAuthToken,
-                    latitude = address.latitude,
-                    longitude = address.longitude
-                )
-                currentTweets.clear()
-                currentTweets.addAll(tweets)
-
-                runOnUiThread {
-                    binding.recyclerView.adapter = TweetsAdapter(tweets)
-                    binding.recyclerView.layoutManager = LinearLayoutManager(this@TweetsActivity)
-                }
-            } catch (exception: Exception) {
-                Log.e("TweetsActivity", "Retrieving Tweets failed", exception)
-                runOnUiThread {
-                    Toast.makeText(this@TweetsActivity, "Failed to retrieve Tweets!", Toast.LENGTH_LONG).show()
-                }
-            }
-        }.start()
-    }
-
-    fun getFakeTweets(): List<Tweet> {
-        return listOf(
-            Tweet(handle = "@nickcapurso", username = "Nick Capurso", content = "We're learning lists!", iconUrl = "https://...."),
-            Tweet(username = "Android Central", handle = "@androidcentral", content = "NVIDIA Shield TV vs. Shield TV Pro: Which should I buy?", iconUrl = "https://...."),
-            Tweet(username = "DC Android", handle = "@DCAndroid", content = "FYI - another great integration for the @Firebase platform", iconUrl = "https://...."),
-            Tweet(username = "KotlinConf", handle = "@kotlinconf", content = "Can't make it to KotlinConf this year? We have a surprise for you. We'll be live streaming the keynotes, closing panel and an entire track over the 2 main conference days. Sign-up to get notified once we go live!", iconUrl = "https://...."),
-            Tweet(username = "Android Summit", handle = "@androidsummit", content = "What a #Keynote! @SlatteryClaire is the Director of Performance at Speechless, and that's exactly how she left us after her amazing (and interactive!) #keynote at #androidsummit. #DCTech #AndroidDev #Android", iconUrl = "https://...."),
-            Tweet(username = "Fragmented Podcast", handle = "@FragmentedCast", content = ".... annnnnnnnnd we're back!\n\nThis week @donnfelker talks about how it's Ok to not know everything and how to set yourself up mentally for JIT (Just In Time [learning]). Listen in here: \nhttp://fragmentedpodcast.com/episodes/135/ ", iconUrl = "https://...."),
-            Tweet(username = "Jake Wharton", handle = "@JakeWharton", content = "Free idea: location-aware physical password list inside a password manager. Mostly for garage door codes and the like. I want to open my password app, switch to the non-URL password section, and see a list of things sorted by physical distance to me.", iconUrl = "https://...."),
-            Tweet(username = "Droidcon Boston", handle = "@droidconbos", content = "#DroidconBos will be back in Boston next year on April 8-9!", iconUrl = "https://...."),
-            Tweet(username = "AndroidWeekly", handle = "@androidweekly", content = "Latest Android Weekly Issue 327 is out!\nhttp://androidweekly.net/ #latest-issue  #AndroidDev", iconUrl = "https://...."),
-            Tweet(username = ".droidconSF", handle = "@droidconSF", content = "Drum roll please.. Announcing droidcon SF 2018! November 19-20 @ Mission Bay Conference Center. Content and programming by @tsmith & @joenrv.", iconUrl = "https://...."),
-        )
-    }
 }
+
+private fun String.toHashtag(): String = lowercase()
+    .replace(Regex("[^a-z0-9]"), "")
+    .trim()
