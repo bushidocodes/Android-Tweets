@@ -48,9 +48,6 @@ class TweetsFragment : Fragment() {
             ?: "Unknown"
         requireActivity().title = getString(R.string.tweets_title, city)
 
-        binding.addTweet.hide()
-        binding.tweetContent.visibility = View.GONE
-
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.tweets.collect { result ->

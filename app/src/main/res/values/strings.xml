@@ -8,8 +8,6 @@
     <string name="tweets_title">Android Tweets near %1$s</string>
     <string name="title_activity_maps">Map</string>
     <string name="choose_location">Choose a Location</string>
-    <string name="write_a_tweet">Write a Tweet</string>
     <string name="current_location_desc">Use current location</string>
-    <string name="add_tweet_desc">Add tweet</string>
     <string name="profile_icon_desc">Profile picture</string>
 </resources>
