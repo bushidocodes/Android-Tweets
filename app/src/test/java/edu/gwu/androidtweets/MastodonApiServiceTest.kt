@@ -90,6 +90,26 @@ class MastodonApiServiceTest {
     }
 
     @Test
+    fun `tagTimeline includes max_id param when provided`() = runTest {
+        mockWebServer.enqueue(MockResponse().setBody("[]").setResponseCode(200))
+
+        service().tagTimeline(hashtag = "Android", maxId = "111111111111111112")
+
+        val path = mockWebServer.takeRequest().path!!
+        assertTrue("path should include max_id param", path.contains("max_id=111111111111111112"))
+    }
+
+    @Test
+    fun `tagTimeline omits max_id param when null`() = runTest {
+        mockWebServer.enqueue(MockResponse().setBody("[]").setResponseCode(200))
+
+        service().tagTimeline(hashtag = "Android", maxId = null)
+
+        val path = mockWebServer.takeRequest().path!!
+        assertTrue("path should not include max_id when null", !path.contains("max_id"))
+    }
+
+    @Test
     fun `tagTimeline ignores unknown JSON fields`() = runTest {
         val jsonWithExtraFields = """
             [{"id":"1","content":"<p>Test</p>","uri":"https://example.com/1","created_at":"2024-01-01T00:00:00.000Z",

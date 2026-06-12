@@ -6,7 +6,8 @@ fun StatusDto.toTweet(): Tweet = Tweet(
     username = account.displayName.ifEmpty { account.username },
     handle = "@${account.acct}",
     content = content.stripHtml(),
-    iconUrl = account.avatar
+    iconUrl = account.avatar,
+    id = id
 )
 
 private fun String.stripHtml(): String = replace(Regex("<[^>]+>"), "")
