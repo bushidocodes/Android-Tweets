@@ -6,7 +6,8 @@ data class Tweet(
     val username: String,
     val handle: String,
     val content: String,
-    val iconUrl: String
+    val iconUrl: String,
+    val id: String = ""
 ) : Serializable {
     // Required by Firebase
     constructor() : this("", "", "", "")

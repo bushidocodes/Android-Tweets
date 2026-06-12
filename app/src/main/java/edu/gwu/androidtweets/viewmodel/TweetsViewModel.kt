@@ -26,11 +26,43 @@ class TweetsViewModel(
     private val _tweets = MutableStateFlow<Result<List<Tweet>>?>(null)
     val tweets: StateFlow<Result<List<Tweet>>?> = _tweets.asStateFlow()
 
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    private var cityTag: String? = null
+    private var lastId: String? = null
+
     fun loadTweets(address: Address) {
         viewModelScope.launch {
             _tweets.value = runCatching {
-                withContext(Dispatchers.IO) { fetchTweets(address, apiService) }
+                withContext(Dispatchers.IO) {
+                    val result = fetchInitialTweets(address, apiService)
+                    cityTag = result.cityTag
+                    lastId = result.tweets.lastOrNull()?.id
+                    result.tweets
+                }
             }
+        }
+    }
+
+    fun loadMoreTweets() {
+        val currentLastId = lastId ?: return
+        val currentList = _tweets.value?.getOrNull() ?: return
+        if (_isLoadingMore.value) return
+
+        viewModelScope.launch {
+            _isLoadingMore.value = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    apiService.tagTimeline("Android", cityTag, maxId = currentLastId).map { it.toTweet() }
+                }
+            }.onSuccess { newTweets ->
+                if (newTweets.isNotEmpty()) {
+                    lastId = newTweets.last().id
+                    _tweets.value = Result.success(currentList + newTweets)
+                }
+            }
+            _isLoadingMore.value = false
         }
     }
 
@@ -46,21 +78,33 @@ class TweetsViewModel(
     }
 }
 
+internal data class InitialFetchResult(
+    val tweets: List<Tweet>,
+    val cityTag: String?
+)
+
 /**
  * Pure business logic: city-filtered hashtag search with fallback to unfiltered #Android.
+ * Returns both the tweets and the city tag that was actually used (null = unfiltered fallback).
  * Extracted from the ViewModel so it can be tested without lifecycle/dispatcher complexity.
  */
-internal suspend fun fetchTweets(address: Address, apiService: MastodonApiService): List<Tweet> {
+internal suspend fun fetchInitialTweets(address: Address, apiService: MastodonApiService): InitialFetchResult {
     val city = address.locality
         ?: address.subAdminArea
         ?: address.adminArea
         ?: address.countryName
         ?: ""
     val cityTag = city.toHashtag()
-    val filtered = if (cityTag.isNotEmpty()) {
-        apiService.tagTimeline("Android", cityTag)
-    } else emptyList()
-    return filtered.ifEmpty { apiService.tagTimeline("Android") }.map { it.toTweet() }
+    return if (cityTag.isNotEmpty()) {
+        val filtered = apiService.tagTimeline("Android", cityTag)
+        if (filtered.isNotEmpty()) {
+            InitialFetchResult(filtered.map { it.toTweet() }, cityTag)
+        } else {
+            InitialFetchResult(apiService.tagTimeline("Android").map { it.toTweet() }, null)
+        }
+    } else {
+        InitialFetchResult(apiService.tagTimeline("Android").map { it.toTweet() }, null)
+    }
 }
 
 internal fun String.toHashtag(): String = lowercase()
