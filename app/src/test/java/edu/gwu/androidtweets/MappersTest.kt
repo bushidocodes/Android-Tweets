@@ -94,5 +94,6 @@ class MappersTest {
         assertEquals("@androiddev@mastodon.social", tweet.handle)
         assertEquals("Just published my new Android app! #Android", tweet.content)
         assertEquals("https://files.mastodon.social/accounts/avatars/1001/original/avatar.png", tweet.iconUrl)
+        assertEquals("111111111111111111", tweet.id)
     }
 }

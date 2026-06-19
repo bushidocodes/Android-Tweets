@@ -16,6 +16,7 @@ interface MastodonApiService {
     suspend fun tagTimeline(
         @Path("hashtag") hashtag: String,
         @Query("all[]") cityTag: String? = null,
-        @Query("limit") limit: Int = 20
+        @Query("limit") limit: Int = 20,
+        @Query("max_id") maxId: String? = null
     ): List<StatusDto>
 }

@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import edu.gwu.androidtweets.databinding.FragmentTweetsBinding
 import edu.gwu.androidtweets.viewmodel.MapsViewModel
 import edu.gwu.androidtweets.viewmodel.TweetsViewModel
@@ -26,6 +27,8 @@ class TweetsFragment : Fragment() {
     // Reads the address selected in MapsFragment (activity-scoped)
     private val mapsViewModel: MapsViewModel by activityViewModels()
     private val viewModel: TweetsViewModel by viewModels { TweetsViewModel.Factory }
+
+    private var tweetsAdapter: TweetsAdapter? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -48,6 +51,17 @@ class TweetsFragment : Fragment() {
             ?: "Unknown"
         requireActivity().title = getString(R.string.tweets_title, city)
 
+        binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (dy <= 0) return
+                val lm = recyclerView.layoutManager as LinearLayoutManager
+                if (lm.findLastVisibleItemPosition() >= lm.itemCount - 3) {
+                    viewModel.loadMoreTweets()
+                }
+            }
+        })
+
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.tweets.collect { result ->
@@ -55,15 +69,31 @@ class TweetsFragment : Fragment() {
                         result == null -> {}
                         result.isSuccess -> {
                             val tweets = result.getOrNull()!!
-                            binding.recyclerView.adapter = TweetsAdapter(tweets)
-                            binding.recyclerView.layoutManager =
-                                LinearLayoutManager(requireContext())
+                            val current = tweetsAdapter
+                            if (current == null) {
+                                tweetsAdapter = TweetsAdapter(tweets).also {
+                                    binding.recyclerView.adapter = it
+                                }
+                            } else {
+                                val newCount = tweets.size - current.itemCount
+                                if (newCount > 0) {
+                                    current.appendTweets(tweets.subList(current.itemCount, tweets.size))
+                                }
+                            }
                         }
                         else -> {
                             Log.e("TweetsFragment", "Failed to load posts", result.exceptionOrNull())
                             Toast.makeText(requireContext(), "Failed to retrieve posts!", Toast.LENGTH_LONG).show()
                         }
                     }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.isLoadingMore.collect { loading ->
+                    binding.loadingMore.visibility = if (loading) View.VISIBLE else View.GONE
                 }
             }
         }
@@ -75,6 +105,7 @@ class TweetsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        tweetsAdapter = null
         _binding = null
     }
 }
